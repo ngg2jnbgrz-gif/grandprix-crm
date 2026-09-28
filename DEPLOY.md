@@ -28,99 +28,67 @@ brand-neutral.
 
 ## A. Netlify (primary, recommended)
 
-Netlify has no Postgres, so the app connects to an **external Postgres**
-(Neon recommended). Netlify auto-detects the Next.js runtime — no plugin
-needed. The build command runs `prisma migrate deploy` *before*
-`npm run build`, so migrations apply automatically on every deploy.
-`next.config.ts` only enables `output: "standalone"` when `DOCKER_BUILD` is
-set, so Netlify builds use Netlify's own runtime — leave that as-is.
+The easiest path needs **no separate database account**: attach **Netlify DB**
+(built-in managed Postgres) to the site and Netlify injects the connection
+string automatically. The build script (`scripts/netlify-build.sh`) resolves
+the database, runs `prisma migrate deploy` *before* `npm run build`, so
+migrations apply on every deploy. Only **one** env var is strictly required:
+`BETTER_AUTH_SECRET`. `APP_URL` falls back to Netlify's own site URL — set it
+explicitly only when you attach a custom domain (step 7).
 
-### 1. Push the repo to Git
+Prefer an external Postgres (Neon, Supabase, …)? Just set `DATABASE_URL` —
+it takes priority over the Netlify DB variables.
 
-Push this repository to GitHub, GitLab, or Bitbucket (private repo is
-fine). Netlify will build from there.
+### 1. Create the site from GitHub
 
-### 2. Create the Netlify site
+Click **Deploy to Netlify** (or Netlify Dashboard → Add new site → Import
+existing project), connect the repo, and sign in with GitHub. `netlify.toml`
+already carries the build settings — just confirm them.
 
-Netlify Dashboard → **Add new site → Import existing project** → connect
-the repo, then set:
+The first build will fail (no database yet) — that's expected. Continue.
 
-| Setting        | Value                                          |
-| -------------- | ---------------------------------------------- |
-| Build command  | `npx prisma migrate deploy && npm run build`   |
-| Publish dir    | `.next`                                        |
-| Node version   | `24` (already set in `netlify.toml`)           |
+### 2. Attach Netlify DB
 
-(`netlify.toml` in the repo root carries these same settings, so they apply
-automatically — you only need to confirm.)
+Netlify Dashboard → your site → **Database** → create/enable a database.
+No new account, nothing to copy — Netlify injects `NETLIFY_DB_URL`
+automatically at build and runtime.
 
-### 3. Provision Neon (Postgres)
-
-1. Go to **neon.tech** → sign up → **New project** (name it e.g.
-   `grandprix-crm`, pick a region close to your users).
-2. Open the project → **Connection details** → make sure **Pooled
-   connection** is selected.
-3. Copy the connection string. It looks like:
-
-   `postgresql://USER:PASSWORD@ep-xxxx-pooler.us-east-2.aws.neon.tech/crm?sslmode=require`
-
-   Keep the `?sslmode=require` suffix — Neon requires TLS. The hostname
-   contains `-pooler`, which is what you want on Netlify (serverless
-   functions open many short-lived connections).
-
-### 4. Set environment variables in Netlify
+### 3. Set the one required env var
 
 Netlify Dashboard → **Site settings → Environment → Environment variables**
 → add:
 
-| Variable            | Value / example                                                                                 | Required |
-| ------------------- | ----------------------------------------------------------------------------------------------- | -------- |
-| `DATABASE_URL`      | Neon **pooled** connection string with `?sslmode=require`                                       | Yes      |
-| `APP_URL`           | The app's public URL. Initially your `https://<site>.netlify.app`; see step 8 after the domain is attached | Yes |
-| `BETTER_AUTH_SECRET`| Random secret, min 32 chars: `openssl rand -base64 32`                                          | Yes      |
-| `DB_PASSWORD`       | Leave empty/unset — Docker Compose only                                                          | No       |
-| `SEED_ADMIN_NAME`   | Only needed for the one-time local bootstrap (step 6). Do not set in Netlify.                   | No       |
-| `SEED_ADMIN_EMAIL`  | Same as above                                                                                  | No       |
-| `SEED_ADMIN_PASSWORD` | Same as above                                                                                | No       |
+| Variable             | Value                                              | Required |
+| -------------------- | -------------------------------------------------- | -------- |
+| `BETTER_AUTH_SECRET` | Random secret, min 32 chars: `openssl rand -base64 32` | Yes  |
+| `DATABASE_URL`       | Only if using an external Postgres instead of Netlify DB | No |
+| `APP_URL`            | Only when a custom domain is attached (step 7)     | No       |
+| `DB_PASSWORD`        | Leave empty/unset — Docker Compose only            | No       |
 
-Never commit real values to the repo. Scope the vars to Production (and
-Deploy Previews if you use them).
+Scope the vars to Production (and Deploy Previews if you use them).
 
-### 5. Deploy
+### 4. Deploy
 
-Trigger a deploy (**Deploys → Trigger deploy**). The build command first runs
-`prisma migrate deploy` against Neon (creating all tables on the first run),
-then builds the app. Check the build log for both stages succeeding.
+**Deploys → Trigger deploy.** The build resolves the database, applies
+Prisma migrations (creating all tables on the first run), then builds the
+app. Check the build log for both stages succeeding.
 
-### 6. One-time data: seed + owner bootstrap (run LOCALLY)
+### 5. First boot: open /setup (no terminal needed)
 
-Seed and bootstrap need to run against Neon from a machine with the repo
-(Node 24). You do **not** do this inside Netlify:
+Go to `https://<your-site>.netlify.app/setup` on your phone or computer:
 
-```bash
-# 1. In a terminal on your own machine:
-cp .env.example .env
+1. Enter your name, email, and a password (min 12 characters) → creates
+   your **owner** account on the Grand Prix Dynamics workspace.
+2. Optionally upload the partner-lead spreadsheet (`.xlsx`) → imports every
+   contact into Patchogue Flooring; hot-list rows automatically become
+   priority opportunities.
 
-# 2. Edit .env:
-#    - DATABASE_URL = your Neon POOLED string (with ?sslmode=require)
-#    - APP_URL      = your Netlify site URL
-#    - BETTER_AUTH_SECRET = a secret (openssl rand -base64 32)
-#    - SEED_ADMIN_NAME / SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD =
-#      the owner's name, login email, and a TEMPORARY password
-#      (forced reset on first login — pick something you will change)
-#    - Leave DB_PASSWORD blank (Docker only)
+**This screen permanently disappears after setup** — it refuses to run once
+any user exists. (Advanced alternative: the CLI seed + bootstrap in
+`prisma/seed.ts` / `prisma/bootstrap-admin.ts` still work for scripted
+deploys — see git history / ARCHITECTURE.md.)
 
-npm install
-npm run prisma:seed        # idempotent: businesses + Patchogue Flooring leads
-npm run bootstrap:admin    # idempotent: owner User + Member on
-                           # "Grand Prix Dynamics" org
-```
-
-Both commands are idempotent and safe to re-run; they skip anything that
-already exists. **After the bootstrap succeeds, blank the `SEED_ADMIN_*`
-values in your local `.env`** and never put them in Netlify or the repo.
-
-### 7. Custom domain (DNS in Canva)
+### 6. Custom domain (DNS in Canva)
 
 1. In your Canva domain DNS settings, add a **CNAME** record:
    - Host/Name: `app`
@@ -129,9 +97,9 @@ values in your local `.env`** and never put them in Netlify or the repo.
 2. Netlify Dashboard → **Domain settings → Add custom domain** →
    `app.grandprixdynamics.com`.
 3. Netlify provisions TLS automatically (may take a few minutes — wait for
-   the certificate to show as active before step 8).
+   the certificate to show as active before step 7).
 
-### 8. CRITICAL: update APP_URL and redeploy
+### 7. Point APP_URL at the custom domain and redeploy
 
 After the custom domain is attached and TLS is active:
 
@@ -145,15 +113,13 @@ After the custom domain is attached and TLS is active:
 fail with callback errors even though everything else looks fine. See
 "Troubleshooting" below.
 
-### 9. Log in
+### 8. Log in
 
-Go to `https://app.grandprixdynamics.com/login`, sign in with the
-`SEED_ADMIN_EMAIL` + temporary password from step 6, complete the **forced
-password reset**, and you're done. The platform owner lands on the HUD shell;
+Go to `https://app.grandprixdynamics.com/login`, sign in with the email +
+password you chose in step 5. The platform owner lands on the HUD shell;
 Client Accounts manages the businesses.
 
 ---
-
 ## B. Docker / VPS (secondary)
 
 Same app, self-hosted Postgres in the same stack. `next.config.ts` emits

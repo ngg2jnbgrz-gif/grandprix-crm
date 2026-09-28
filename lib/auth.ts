@@ -9,7 +9,7 @@ import { db } from "./db";
 // Credential accounts must mirror better-auth's own shape exactly:
 //   { providerId: "credential", accountId: <user.id>, password: <scrypt hash> }
 
-const appUrl = process.env.APP_URL;
+const appUrl = process.env.APP_URL || process.env.URL; // Netlify injects URL = the site's primary URL
 const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 if (!appUrl && !isBuildPhase) {
   // Fail fast at real boot (dev server, production runtime). The build phase
@@ -17,9 +17,10 @@ if (!appUrl && !isBuildPhase) {
   // data without env vars present — there it gets a throwaway placeholder
   // that can never serve traffic, because any real boot still throws above.
   throw new Error(
-    "APP_URL is not set. Set APP_URL to the public base URL of this deployment " +
-      "(e.g. https://app.grandprixdynamics.com) so Better Auth callbacks, " +
-      "cookie domains and email links work.",
+    "APP_URL is not set (and no Netlify URL fallback found). Set APP_URL to " +
+      "the public base URL of this deployment (e.g. " +
+      "https://app.grandprixdynamics.com) so Better Auth callbacks, cookie " +
+      "domains and email links work.",
   );
 }
 if (!process.env.BETTER_AUTH_SECRET && !isBuildPhase) {

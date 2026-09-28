@@ -24,6 +24,10 @@ const PROTECTED_PREFIXES = [
 function isPublic(path: string): boolean {
   if (path === "/") return true;
   if (path === "/login" || path === "/reset-password") return true;
+  // /setup is the one-shot first-boot wizard — it must stay reachable
+  // without a session. Its own page + server action refuse to run once any
+  // user exists, so listing it here grants no ongoing access.
+  if (path === "/setup") return true;
   if (path.startsWith("/api/auth/")) return true;
   if (path === "/api/health") return true;
   return false;
