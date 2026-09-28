@@ -41,7 +41,18 @@ function str(v: unknown): string {
 
 export async function runSetup(formData: FormData): Promise<SetupResult> {
   // Gate: one-shot. If anyone already exists, this endpoint is dead.
-  const existingUsers = await db.user.count();
+  // If the database isn't reachable/migrated yet, fail with guidance
+  // instead of a raw Prisma error.
+  let existingUsers: number;
+  try {
+    existingUsers = await db.user.count();
+  } catch {
+    return {
+      ok: false,
+      error:
+        "Can't reach the database yet. In Netlify: attach a database to the site, then Deploys → Trigger deploy, and try setup again.",
+    };
+  }
   if (existingUsers > 0) {
     return {
       ok: false,

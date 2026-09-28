@@ -45,7 +45,8 @@ Click **Deploy to Netlify** (or Netlify Dashboard → Add new site → Import
 existing project), connect the repo, and sign in with GitHub. `netlify.toml`
 already carries the build settings — just confirm them.
 
-The first build will fail (no database yet) — that's expected. Continue.
+The first build succeeds without a database (migrations are skipped with a
+warning) — that's expected. Continue.
 
 ### 2. Attach Netlify DB
 
