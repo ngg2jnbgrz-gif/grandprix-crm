@@ -1,0 +1,335 @@
+// Grand Prix CRM — foundation schema (stage 1, Better Auth edition).
+//
+// Auth tables (User, Session, Account, Verification, Organization, Member,
+// Invitation) follow Better Auth's expected field names EXACTLY — the auth
+// stage verifies with `npx @better-auth/cli generate`. Do not rename fields.
+//
+// Multi-tenancy: Organization IS the tenant (replaces the old Business
+// concept). Every tenant-facing model carries `businessId` -> Organization
+// and @@index([businessId]). All IDs are String cuid.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Better Auth tables ──────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  emailVerified     Boolean   @default(false)
+  image             String?
+  mustResetPassword Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  sessions          Session[]
+  accounts          Account[]
+  members           Member[]
+  invitations       Invitation[] @relation("InvitationInviter")
+
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token                String   @unique
+  expiresAt            DateTime
+  ipAddress            String?
+  userAgent            String?
+  activeOrganizationId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  logo         String?
+  metadata     String?
+  website      String   @default("")
+  industry     String   @default("")
+  phone        String   @default("")
+  logoUrl      String   @default("")
+  primaryColor String   @default("#07111a")
+  accent       String   @default("#35e7ff")
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  members       Member[]
+  invitations   Invitation[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+  tasks         Task[]
+  appointments  Appointment[]
+  campaigns     Campaign[]
+  automations   Automation[]
+  invoices      Invoice[]
+  reviews       Review[]
+  socialPosts   SocialPost[]
+  webAssets     WebAsset[]
+  integrations  Integration[]
+  auditLogs     AuditLog[]
+
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String       @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  inviterId      String
+  inviter        User         @relation("InvitationInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invitation")
+}
+
+// ── CRM tables (all tenant-scoped via businessId -> Organization) ───
+
+model Contact {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  firstName    String       @default("")
+  lastName     String       @default("")
+  company      String       @default("")
+  email        String       @default("")
+  phone        String       @default("")
+  website      String       @default("")
+  town         String       @default("")
+  category     String       @default("")
+  temperature  String       @default("warm") // cold | warm | hot
+  priority     Boolean      @default(false)
+  source       String       @default("")
+  notes        String       @default("")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  opportunities Opportunity[]
+  tasks         Task[]
+  appointments  Appointment[]
+  invoices      Invoice[]
+  reviews       Review[]
+
+  @@index([businessId])
+}
+
+model Opportunity {
+  id            String       @id @default(cuid())
+  businessId    String
+  organization  Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contactId     String?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  title         String
+  value         Decimal?     @db.Decimal(12, 2)
+  stage         String       @default("new") // new | contacted | quoted | won | lost
+  probability   Int          @default(10)
+  expectedClose DateTime?
+  notes         String       @default("")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([businessId])
+}
+
+model Task {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  title        String
+  dueDate      DateTime?
+  done         Boolean      @default(false)
+  contactId    String?
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  notes        String       @default("")
+
+  @@index([businessId])
+}
+
+model Appointment {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  title        String
+  startsAt     DateTime
+  endsAt       DateTime?
+  contactId    String?
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  location     String       @default("")
+  notes        String       @default("")
+
+  @@index([businessId])
+}
+
+model Campaign {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  channel      String       @default("email")
+  status       String       @default("draft") // draft | scheduled | sent | archived
+  body         String       @default("")
+  createdAt    DateTime     @default(now())
+
+  @@index([businessId])
+}
+
+model Automation {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  trigger      String       @default("")
+  action       String       @default("")
+  enabled      Boolean      @default(true)
+
+  @@index([businessId])
+}
+
+model Invoice {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  number       String       @default("")
+  contactId    String?
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  amount       Decimal      @default(0) @db.Decimal(12, 2)
+  status       String       @default("draft") // draft | sent | paid | overdue | void
+  dueDate      DateTime?
+  notes        String       @default("")
+
+  @@index([businessId])
+}
+
+model Review {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contactId    String?
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  author       String       @default("")
+  rating       Int          @default(5)
+  text         String       @default("")
+  source       String       @default("")
+  status       String       @default("new") // new | responded | flagged | published
+
+  @@index([businessId])
+}
+
+model SocialPost {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  channel      String       @default("")
+  content      String       @default("")
+  scheduledAt  DateTime?
+  status       String       @default("draft") // draft | scheduled | published | failed
+
+  @@index([businessId])
+}
+
+model WebAsset {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  kind         String       @default("site") // site | funnel | form
+  url          String       @default("")
+  status       String       @default("draft") // draft | live | paused
+  notes        String       @default("")
+
+  @@index([businessId])
+}
+
+model Integration {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  kind         String       @default("other") // mcp | email | calendar | payment | other
+  config       Json         @default("{}")
+  status       String       @default("disabled") // disabled | connected | error
+
+  @@index([businessId])
+}
+
+model AuditLog {
+  id           String       @id @default(cuid())
+  businessId   String
+  organization Organization @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  actorId      String?
+  action       String
+  entity       String       @default("")
+  entityId     String?
+  meta         Json?
+  createdAt    DateTime     @default(now())
+
+  @@index([businessId])
+}

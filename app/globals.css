@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* HUD theme tokens — keep in sync with tailwind.config.js `hud` palette
+   and the Organization.primaryColor / Organization.accent defaults.
+   --hud-accent / --hud-primary are OVERRIDDEN per tenant by the (app)
+   layout wrapper div (server-side cascade); these are the fallbacks. */
+:root {
+  --hud-bg: #07111a;
+  --hud-panel: #0b1a26;
+  --hud-cyan: #35e7ff;
+  --hud-ink: #e8f4fa;
+  --hud-muted: #8ba3b3;
+  --hud-line: #1d3448;
+  --hud-accent: #35e7ff;
+  --hud-primary: #07111a;
+}
+
+html,
+body {
+  background: var(--hud-bg);
+  color: var(--hud-ink);
+}
+
+/* ── HUD textures ─────────────────────────────────────────────── */
+/* Subtle blueprint grid over the app background. Tasteful, not gaudy. */
+.hud-grid-bg {
+  background-image:
+    linear-gradient(rgba(53, 231, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 231, 255, 0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+/* Angular clipped corners — the HUD panel signature. Borders are cut at
+   the corners by design. Do NOT put these on ancestors of custom
+   dropdowns/overlays (clip-path clips absolutely-positioned children). */
+.hud-clip {
+  clip-path: polygon(
+    12px 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%,
+    0 12px
+  );
+}
+.hud-clip-sm {
+  clip-path: polygon(
+    7px 0,
+    100% 0,
+    100% calc(100% - 7px),
+    calc(100% - 7px) 100%,
+    0 100%,
+    0 7px
+  );
+}
+
+/* ── Form controls ────────────────────────────────────────────── */
+input[type="color"].hud-swatch {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid var(--hud-line);
+  background: transparent;
+  padding: 0;
+}
+input[type="color"].hud-swatch::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+input[type="color"].hud-swatch::-webkit-color-swatch {
+  border: none;
+}
+input[type="color"].hud-swatch::-moz-color-swatch {
+  border: none;
+}
+
+/* ── Scrollbars & selection ───────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1d3448 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #1d3448;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+::selection {
+  background: rgba(53, 231, 255, 0.28);
+  color: #e8f4fa;
+}

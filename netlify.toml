@@ -1,0 +1,16 @@
+# Grand Prix CRM — Netlify build configuration (primary deploy target).
+#
+# Netlify auto-detects the Next.js runtime (no plugin needed); the build
+# command runs pending Prisma migrations against the external Postgres
+# (Neon) BEFORE `npm run build` so the schema is always current.
+#
+# Required env vars (Site settings → Environment): see .env.example and
+# DEPLOY.md for the full table — at minimum DATABASE_URL, APP_URL and
+# BETTER_AUTH_SECRET.
+
+[build]
+  command = "npx prisma migrate deploy && npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "24"
