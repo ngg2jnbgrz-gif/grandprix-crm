@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { requireOrg } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { HudPanel } from "@/components/ui/hud-panel";
 import { StatCard } from "@/components/ui/stat-card";
+import { AnimatedNumber } from "@/components/ui/animated-number";
+import { Button } from "@/components/ui/forms";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -46,6 +49,8 @@ export default async function DashboardPage() {
     hotOpps,
     overdueTasks,
     soonAppts,
+    hotTargetTotal,
+    hotTargetWorked,
   ] = await Promise.all([
     db.contact.count({ where: { businessId } }),
     db.contact.count({
@@ -99,6 +104,16 @@ export default async function DashboardPage() {
       },
       orderBy: { startsAt: "asc" },
       take: 5,
+    }),
+    db.contact.count({ where: { businessId, priority: true } }),
+    db.contact.count({
+      where: {
+        businessId,
+        priority: true,
+        opportunities: {
+          some: { businessId, stage: { notIn: ["won", "lost", "new"] } },
+        },
+      },
     }),
   ]);
 
@@ -158,10 +173,14 @@ export default async function DashboardPage() {
 
       {/* ── Stat cards ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-        <StatCard label="Total contacts" value={totalContacts} sub="in workspace" />
+        <StatCard
+          label="Total contacts"
+          value={<AnimatedNumber value={totalContacts} />}
+          sub="in workspace"
+        />
         <StatCard
           label="Hot / priority"
-          value={hotContacts}
+          value={<AnimatedNumber value={hotContacts} />}
           sub="priority or hot temperature"
           tone="amber"
         />
@@ -171,25 +190,67 @@ export default async function DashboardPage() {
           sub={`${openOppCount} open ${openOppCount === 1 ? "opportunity" : "opportunities"}`}
           tone="green"
         />
-        <StatCard label="Open tasks" value={openTasks} sub="not completed" />
+        <StatCard
+          label="Open tasks"
+          value={<AnimatedNumber value={openTasks} />}
+          sub="not completed"
+        />
         <StatCard
           label="Appointments · 7d"
-          value={upcomingAppts}
+          value={<AnimatedNumber value={upcomingAppts} />}
           sub="scheduled ahead"
           tone="violet"
         />
         <StatCard
           label="Active campaigns"
-          value={activeCampaigns}
+          value={<AnimatedNumber value={activeCampaigns} />}
           sub="scheduled or sent"
         />
         <StatCard
           label="Unpaid invoices"
-          value={unpaidCount}
+          value={<AnimatedNumber value={unpaidCount} />}
           sub={`${formatMoney(unpaidValue)} outstanding`}
           tone={unpaidCount > 0 ? "red" : "green"}
         />
       </div>
+
+      {/* ── Today's mission ────────────────────────────────── */}
+      {hotTargetTotal > 0 ? (
+        <HudPanel
+          title="Today's mission"
+          subtitle="Work the hot list — call, text, log the outcome, repeat"
+          actions={
+            <Link href="/outreach">
+              <Button size="sm">Open Outreach Deck →</Button>
+            </Link>
+          }
+        >
+          <div className="flex flex-wrap items-center gap-6">
+            <div>
+              <p className="font-mono text-4xl font-bold tabular-nums text-[var(--hud-accent)]">
+                <AnimatedNumber value={hotTargetTotal - hotTargetWorked} />
+              </p>
+              <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-hud-muted">
+                hot targets remaining
+              </p>
+            </div>
+            <div className="min-w-[200px] flex-1">
+              <div className="h-2 overflow-hidden rounded-full bg-hud-line/40">
+                <div
+                  className="h-full rounded-full bg-[var(--hud-accent)] transition-all"
+                  style={{
+                    width: `${Math.round((hotTargetWorked / hotTargetTotal) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-sm text-hud-muted">
+                {hotTargetWorked} of {hotTargetTotal} hot targets worked — your
+                scripts, call buttons, and follow-ups are waiting in the deck.
+              </p>
+            </div>
+          </div>
+        </HudPanel>
+      ) : null}
 
       {/* ── Hot opportunities ──────────────────────────────── */}
       <HudPanel
