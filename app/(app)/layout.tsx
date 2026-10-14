@@ -50,6 +50,7 @@ export default async function AppGroupLayout({
       label: "Sell",
       items: [
         { href: "/outreach", label: "Outreach Deck" },
+        { href: "/war-room", label: "War Room" },
         { href: "/contacts", label: "Contacts" },
         { href: "/pipeline", label: "Pipeline" },
       ],

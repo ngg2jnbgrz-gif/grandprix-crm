@@ -93,3 +93,88 @@ input[type="color"].hud-swatch::-moz-color-swatch {
   background: rgba(53, 231, 255, 0.28);
   color: #e8f4fa;
 }
+
+/* ── War Room (Tron/Iron-Man HUD) — scoped to .war-room ────────── */
+.war-room {
+  --wr-bg: #04070d;
+  --wr-cyan: #00e5ff;
+  --wr-cyan-dim: #0e7d95;
+  --wr-amber: #ffb300;
+  --wr-ink: #d9f6ff;
+  --wr-muted: #5f7a8c;
+  --wr-line: rgba(0, 229, 255, 0.14);
+  --wr-panel: rgba(4, 12, 20, 0.86);
+  background-color: var(--wr-bg);
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--wr-ink);
+  position: relative;
+}
+.war-room::before {
+  /* scanlines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.14) 4px
+  );
+  z-index: 1;
+}
+.war-room > * {
+  position: relative;
+  z-index: 2;
+}
+.wr-panel {
+  background: var(--wr-panel);
+  border: 1px solid var(--wr-line);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 22px rgba(0, 229, 255, 0.07),
+    inset 0 0 32px rgba(0, 229, 255, 0.03);
+  clip-path: polygon(
+    14px 0, 100% 0, 100% calc(100% - 14px),
+    calc(100% - 14px) 100%, 0 100%, 0 14px
+  );
+}
+.wr-panel-amber {
+  border-color: rgba(255, 179, 0, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 26px rgba(255, 179, 0, 0.1),
+    inset 0 0 32px rgba(255, 179, 0, 0.04);
+}
+.wr-glow-text {
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.65);
+}
+.wr-glow-amber {
+  text-shadow: 0 0 12px rgba(255, 179, 0, 0.65);
+}
+@keyframes wr-sweep {
+  to { transform: rotate(360deg); }
+}
+@keyframes wr-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes wr-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.wr-sweep {
+  animation: wr-sweep 4.5s linear infinite;
+}
+.wr-pulse {
+  animation: wr-pulse 1.8s ease-in-out infinite;
+}
+.wr-blink {
+  animation: wr-blink 1.2s step-start infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wr-sweep, .wr-pulse, .wr-blink { animation: none; }
+}
